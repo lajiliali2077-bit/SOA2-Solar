@@ -64,6 +64,46 @@ def build_matrix(rows, nodes):
         keys.append(key)
     return np.array(X), np.array(y), keys
 
+OVERLOAD_THRESHOLD = 0.92  # surcharge critique : charge du feeder > 92 % de capacity_kw
+
+
+def load_feeder_loads():
+    """Charge d'un feeder à chaque instant = somme des GRID_NET_KW de ses nœuds."""
+    from tunisovereign_core.models import Feeder, ResourceNodePlot, TelemetryReading
+
+    capacity = {f.id: f.capacity_kw for f in Feeder.objects.all()}
+    feeder_of = dict(ResourceNodePlot.objects.values_list("id", "feeder_id"))
+    load, truth = {}, {}
+    qs = TelemetryReading.objects.filter(metric_type="GRID_NET_KW").values_list(
+        "node_id", "timestamp", "value", "is_injected_anomaly"
+    ).iterator(chunk_size=5000)
+    for node_id, ts, value, injected in qs:
+        key = (feeder_of[node_id], ts)
+        load[key] = load.get(key, 0.0) + value
+        truth[key] = truth.get(key, False) or injected
+    return load, truth, capacity
+
+
+def evaluate_feeder_overload_rule(load, truth, capacity, threshold=OVERLOAD_THRESHOLD):
+    """Règle de seuil au niveau feeder, évaluée contre la vérité terrain."""
+    tp = fp = fn = 0
+    for key, total in load.items():
+        flagged = total / capacity[key[0]] > threshold
+        if flagged and truth[key]:
+            tp += 1
+        elif flagged:
+            fp += 1
+        elif truth[key]:
+            fn += 1
+    precision = tp / (tp + fp) if tp + fp else 0.0
+    recall = tp / (tp + fn) if tp + fn else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+    return {
+        "feeder_instants": len(load),
+        "overload_instants": sum(1 for t in truth.values() if t),
+        "tp": tp, "fp": fp, "fn": fn,
+        "precision": round(precision, 4), "recall": round(recall, 4), "f1_score": round(f1, 4),
+    }
 
 class TunisianTelemetryAnomalyEngine:
     """Détecteur IsolationForest + banc d'évaluation Précision / Rappel / F1 sur la base."""
@@ -98,7 +138,13 @@ if __name__ == "__main__":
 
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
     django.setup()
+
     metrics = TunisianTelemetryAnomalyEngine().fit_and_evaluate_from_db()
     print("Évaluation ML (IsolationForest, une ligne = un nœud à un instant) :")
     for name, value in metrics.items():
+        print(f"  {name:<20} {value}")
+
+    feeder_metrics = evaluate_feeder_overload_rule(*load_feeder_loads())
+    print(f"\nRègle de surcharge feeder (> {OVERLOAD_THRESHOLD:.0%} de capacity_kw) :")
+    for name, value in feeder_metrics.items():
         print(f"  {name:<20} {value}")
