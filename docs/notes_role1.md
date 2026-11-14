@@ -16,23 +16,25 @@ Journal de travail pour les slides et la défense orale individuelle.
 ```
 ### Incrément N : titre court (AAAA-MM-JJ, branche xxx)
 - Fait : ...
-- Pourquoi ce choix : ...
-- Testé : `python manage.py check` sans erreur, `makemigrations --check` sans changement, `migrate`, puis 13 tests automatisés (`test_models_0002.py`) : règlement incohérent refusé, fin avant début refusée, doublon (nœud, période) refusé, un seul crédit par règlement, facteur d'émission nul refusé, planning avec puissance négative refusé, score ML vide accepté, `is_verified_on_chain` à False par défaut. Base de dev intacte après les tests (4 feeders, 10 nœuds, 4800 mesures, 0 règlement).
-- Non vérifié / limite : un passage d'agent produit au plus un reçu, car `OnChainZKReceipt.agent_execution` est un OneToOne : régler plusieurs nœuds demande plusieurs passages. Le point « qui écrit les lignes de règlement et de crédit en base » reste à confirmer avec le groupe.
-- Impact sur les autres rôles : ...
+- Pourquoi : ...
 ```
 
 ## Avancement des objectifs du Rôle 1
 
 - [x] 1a. Spec de la migration 0002 dans `docs/models.md`
 - [x] 1b. `models.py` et migration 0002 (appliquée et testée en local)
-- [ ] 2. Stub de `forecast_peak_load`, puis vrai modèle de prévision (avec `forecasted_deficit_24h`)
+- [x] 2a. Stub de `forecast_peak_load` (contrat d'interface respecté, tests automatisés)
+- [ ] 2b. Vrai modèle de prévision (profil horaire moyen des jours précédents + ajustement)
 - [ ] 3. Anomalies de nœud (IsolationForest) : type, sévérité, enregistrement dans `detect_anomalies`
 - [ ] 4. gRPC : `run_agent` sur anomalie CRITICAL, branchement de `TriggerUrgentAudit`
 - [ ] 5. Docker : Dockerfile en Python 3.14, `.dockerignore`, service de l'application, README (facteur d'émission sourcé, tarifs signalés non officiels)
 - [ ] 6. UML de classes (Mermaid), diagramme de séquence, schéma d'architecture, assemblage des slides et de la vidéo, fusion dans `main`
 
 ## Journal (le plus récent en haut)
+
+### Incrément 3 : stub de forecast_peak_load (2026-11-14, branche role1-data)
+- Fait : création de `agent/skills/irradiance_forecaster.py` avec la signature du contrat d'interface, et de ses 8 tests unittest. Le stub ne lit pas la base : il renvoie un profil déterministe sur 24 h (production solaire en cloche, pic de consommation en soirée à 96 % d'une capacité supposée de 100 kW).
+- Pourquoi : les Rôles 2 et 4 attendent la signature pour brancher le serveur MCP et l'agent, et un stub sans accès à la base ne les bloque pas. Le pic à 96 % donne à l'agent une surcharge à corriger pour exercer sa boucle d'auto-correction. `load_kw` est la charge nette (somme des `GRID_NET_KW`) parce que c'est celle comparée au seuil de 92 % ; `forecasted_deficit_24h_kwh` est l'énergie au-dessus de ce seuil, ce que l'optimiseur doit déplacer.
 
 ### Incrément 2 : `models.py` et migration 0002 (2026-11-14, branche role1-data)
 - Fait : ajout de `PumpSchedule`, `NetMeteringSettlement` et `CarbonCredit` dans `models.py`. `isolation_forest_score` devient nullable et `is_verified_on_chain` passe à `False` par défaut. Migration générée : `0002_pumpschedule_settlement_carboncredit`.
