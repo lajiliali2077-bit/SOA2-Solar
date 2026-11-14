@@ -8,7 +8,9 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
 
   redis:
     image: redis:7-alpine
@@ -42,3 +44,6 @@ services:
       - "5678:5678"
     volumes:
       - ./workflows:/home/node/.n8n/workflows
+
+volumes:
+  pgdata:
