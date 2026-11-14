@@ -6,13 +6,16 @@ service TelemetryIngestService {
   rpc TriggerUrgentAudit (AuditRequest) returns (AuditResponse);
 }
 
+// Un paquet = une ligne de TelemetryReading (voir docs/models.md).
+// metric_type : GENERATION_KW | BATTERY_SOC | PUMP_LOAD_KW | VOLTAGE_V | GRID_NET_KW
 message TelemetryPacket {
-  string node_code = 1;
+  string node_code = 1;        // ex. TOZ-001
   string governorate = 2;
   string metric_type = 3;
-  double value = 4;
-  string iso_timestamp = 5;
+  double value = 4;            // kW, % ou V selon metric_type
+  string iso_timestamp = 5;    // ISO 8601, UTC
   string signature_hmac = 6;
+  bool is_injected_anomaly = 7; // vérité terrain du simulateur, jamais une entrée du ML
 }
 
 message IngestAck {
