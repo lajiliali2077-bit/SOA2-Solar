@@ -14,10 +14,10 @@ from tunisovereign_core.models import (
 
 # Capacités PROVISOIRES (kW) : on les recalibrera avec le simulateur.
 FEEDERS = [
-    ("Feeder-TOZ-01", Governorate.TOZEUR, 60.0),
-    ("Feeder-KEB-01", Governorate.KEBILI, 60.0),
-    ("Feeder-TAT-01", Governorate.TATAOUINE, 45.0),
-    ("Feeder-SFX-01", Governorate.SFAX, 90.0),
+    ("Feeder-TOZ-01", Governorate.TOZEUR, 45.0),
+    ("Feeder-KEB-01", Governorate.KEBILI, 47.0),
+    ("Feeder-TAT-01", Governorate.TATAOUINE, 29.0),
+    ("Feeder-SFX-01", Governorate.SFAX, 36.0),
 ]
 
 # Quotas PROVISOIRES (kWh/jour).
