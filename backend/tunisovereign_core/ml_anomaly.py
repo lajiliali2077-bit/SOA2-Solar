@@ -1,55 +1,104 @@
+"""
+Détection d'anomalies SolarSouk-STEG (Track 7).
+
+IsolationForest sur la télémétrie stockée en base. Une ligne du jeu de données = un nœud
+à un instant (ses 5 métriques regroupées). Évaluation : Précision, Rappel, F1.
+
+RÈGLE : is_injected_anomaly sert UNIQUEMENT à évaluer. Il n'est jamais une entrée du modèle.
+
+Depuis le dossier backend :
+    python -m tunisovereign_core.ml_anomaly
+"""
+import math
+import os
+
 import numpy as np
 from sklearn.ensemble import IsolationForest
-from sklearn.metrics import precision_score, recall_score, f1_score
+from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
+
+UTC_OFFSET_H = 1  # Tunisie : UTC+1 toute l'année (la base stocke en UTC)
+REQUIRED_METRICS = ("GENERATION_KW", "PUMP_LOAD_KW", "VOLTAGE_V", "GRID_NET_KW")
+FEATURE_NAMES = ["gen_ratio", "soc_pct", "pump_ratio", "voltage_v", "net_ratio", "hour_sin", "hour_cos"]
+
+
+def load_dataset():
+    """Lit la télémétrie en base. Retourne (lignes regroupées par (nœud, instant), nœuds par id)."""
+    from tunisovereign_core.models import ResourceNodePlot, TelemetryReading
+
+    nodes = {n.id: n for n in ResourceNodePlot.objects.all()}
+    rows = {}
+    qs = TelemetryReading.objects.values_list(
+        "node_id", "timestamp", "metric_type", "value", "is_injected_anomaly"
+    ).iterator(chunk_size=5000)
+    for node_id, ts, metric, value, injected in qs:
+        row = rows.setdefault((node_id, ts), {"v": {}, "y": 0})
+        row["v"][metric] = value
+        if injected:
+            row["y"] = 1  # une ligne est « anormale » si une de ses métriques l'est
+    return rows, nodes
+
+
+def build_matrix(rows, nodes):
+    """Construit X (caractéristiques), y (vérité terrain, pour l'évaluation seulement), keys."""
+    X, y, keys = [], [], []
+    for key in sorted(rows):
+        node_id, ts = key
+        v = rows[key]["v"]
+        if any(m not in v for m in REQUIRED_METRICS):
+            continue  # ligne incomplète
+        n = nodes[node_id]
+        hour = (ts.hour + ts.minute / 60 + UTC_OFFSET_H) % 24
+        angle = 2 * math.pi * hour / 24
+        kwp = max(n.installed_kwp, 1e-6)
+        pump_ratio = v["PUMP_LOAD_KW"] / n.pump_rated_kw if n.pump_rated_kw > 0 else 0.0
+        X.append([
+            v["GENERATION_KW"] / kwp,     # production rapportée à la puissance installée
+            v.get("BATTERY_SOC", 0.0),    # état de charge (%)
+            pump_ratio,                   # charge de la pompe rapportée à sa puissance nominale
+            v["VOLTAGE_V"],
+            v["GRID_NET_KW"] / kwp,       # puissance réseau rapportée à la puissance installée
+            math.sin(angle),              # heure locale en cercle : 23h50 est proche de 0h
+            math.cos(angle),
+        ])
+        y.append(rows[key]["y"])
+        keys.append(key)
+    return np.array(X), np.array(y), keys
 
 
 class TunisianTelemetryAnomalyEngine:
-    '''
-    Dual ML Anomaly Detector (IsolationForest + Rolling Z-Score)
-    with a reproducible Precision / Recall / F1-Score evaluation harness.
-    '''
-    def __init__(self, contamination: float = 0.08, random_state: int = 42):
+    """Détecteur IsolationForest + banc d'évaluation Précision / Rappel / F1 sur la base."""
+
+    def __init__(self, contamination: float = 0.03, random_state: int = 42):
+        # contamination = proportion d'anomalies attendue (hypothèse de départ, à ajuster).
         self.model = IsolationForest(
-            n_estimators=150,
-            contamination=contamination,
-            random_state=random_state,
+            n_estimators=200, contamination=contamination, random_state=random_state
         )
 
-    def fit_and_evaluate_synthetic_benchmark(self, n_samples: int = 500) -> dict:
-        rng = np.random.default_rng(42)
-        hours = np.linspace(0, 72, n_samples)
-        # Normal diurnal Tunisian semi-arid pattern: moisture (%), temp (C), flow (L/min)
-        moisture = 58.0 + 6.0 * np.sin(2 * np.pi * hours / 24.0) + rng.normal(0, 1.8, n_samples)
-        temp = 26.0 - 5.0 * np.cos(2 * np.pi * hours / 24.0) + rng.normal(0, 1.1, n_samples)
-        flow = 120.0 + 15.0 * np.sin(2 * np.pi * hours / 12.0) + rng.normal(0, 4.0, n_samples)
+    def fit_and_evaluate_from_db(self) -> dict:
+        rows, nodes = load_dataset()
+        X, y, _keys = build_matrix(rows, nodes)
+        if len(y) == 0:
+            raise ValueError("Aucune télémétrie complète en base : lancez le simulateur d'abord.")
 
-        y_true = np.zeros(n_samples, dtype=int)
-        # Inject 40 true anomalies (pipe burst drops, Sirocco heat spikes, unauthorized pumping)
-        anomaly_indices = rng.choice(n_samples, size=40, replace=False)
-        for idx in anomaly_indices:
-            y_true[idx] = 1
-            moisture[idx] -= rng.uniform(18.0, 28.0)
-            temp[idx] += rng.uniform(8.0, 14.0)
-            flow[idx] += rng.uniform(55.0, 95.0)
-
-        X = np.column_stack([moisture, temp, flow])
-        preds_raw = self.model.fit_predict(X)
-        y_pred = (preds_raw == -1).astype(int)
-
-        precision = round(float(precision_score(y_true, y_pred, zero_division=0)), 4)
-        recall = round(float(recall_score(y_true, y_pred, zero_division=0)), 4)
-        f1 = round(float(f1_score(y_true, y_pred, zero_division=0)), 4)
+        y_pred = (self.model.fit_predict(X) == -1).astype(int)  # y n'entre jamais dans fit
+        tn, fp, fn, tp = confusion_matrix(y, y_pred, labels=[0, 1]).ravel()
         return {
-            "samples": n_samples,
-            "injected_anomalies": int(y_true.sum()),
-            "detected_anomalies": int(y_pred.sum()),
-            "precision": precision,
-            "recall": recall,
-            "f1_score": f1,
+            "rows": int(len(y)),
+            "injected_anomalies": int(y.sum()),
+            "flagged": int(y_pred.sum()),
+            "tp": int(tp), "fp": int(fp), "fn": int(fn), "tn": int(tn),
+            "precision": round(float(precision_score(y, y_pred, zero_division=0)), 4),
+            "recall": round(float(recall_score(y, y_pred, zero_division=0)), 4),
+            "f1_score": round(float(f1_score(y, y_pred, zero_division=0)), 4),
         }
 
 
 if __name__ == "__main__":
-    engine = TunisianTelemetryAnomalyEngine()
-    metrics = engine.fit_and_evaluate_synthetic_benchmark()
-    print("ML Anomaly Evaluation Metrics:", metrics)
+    import django
+
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+    django.setup()
+    metrics = TunisianTelemetryAnomalyEngine().fit_and_evaluate_from_db()
+    print("Évaluation ML (IsolationForest, une ligne = un nœud à un instant) :")
+    for name, value in metrics.items():
+        print(f"  {name:<20} {value}")
