@@ -28,3 +28,8 @@ broadcast/
 .vscode/
 .idea/
 *.swp
+# zedneh
+db.sqlite3
+.venv/
+.env
+__pycache__/
