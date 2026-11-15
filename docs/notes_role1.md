@@ -26,11 +26,18 @@ Journal de travail pour les slides et la défense orale individuelle.
 - [x] 2a. Stub de `forecast_peak_load` (contrat d'interface respecté, tests automatisés)
 - [x] 2b. Vrai modèle de prévision (profil horaire moyen des jours précédents + ajustement)
 - [ ] 3. Anomalies de nœud (IsolationForest) : type, sévérité, enregistrement dans `detect_anomalies`
-- [ ] 4. gRPC : `run_agent` sur anomalie CRITICAL, branchement de `TriggerUrgentAudit`
+- [x] 4. gRPC : `run_agent` sur anomalie CRITICAL, branchement de `TriggerUrgentAudit`
 - [ ] 5. Docker : Dockerfile en Python 3.14, `.dockerignore`, service de l'application, README (facteur d'émission sourcé, tarifs signalés non officiels)
 - [ ] 6. UML de classes (Mermaid), diagramme de séquence, schéma d'architecture, assemblage des slides et de la vidéo, fusion dans `main`
 
 ## Journal (le plus récent en haut)
+
+
+
+## 4. :
+
+- Fait : TriggerUrgentAudit appelle run_agent avec un repli propre.
+- Pourquoi pas d’exécution factice en repli : on évite de polluer le tableau de bord avec de fausses exécutions.
 
 ## 2.b :
 - Fait : prévision par profil médian au pas de 15 minutes, avec 12 tests sans base de données.
