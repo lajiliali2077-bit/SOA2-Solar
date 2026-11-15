@@ -104,7 +104,12 @@ class Command(BaseCommand):
         for username, role, gov, is_staff in USERS:
             user, created = StakeholderUser.objects.get_or_create(
                 username=username,
-                defaults={"role": role, "governorate": gov, "is_staff": is_staff},
+             defaults={
+                 "role": role,
+                 "governorate": gov,
+                 "is_staff": is_staff,
+                 "is_superuser": is_staff,  # seul admin_national est staff : il devient aussi superutilisateur
+             },
             )
             if created:
                 user.set_password(SEED_PASSWORD)
