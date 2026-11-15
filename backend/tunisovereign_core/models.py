@@ -214,7 +214,11 @@ class AnomalyAndForecastEvent(models.Model):
     detected_at = models.DateTimeField(auto_now_add=True)
     anomaly_type = models.CharField(max_length=64, choices=AnomalyType.choices)
     severity = models.CharField(max_length=16, choices=Severity.choices)
-    isolation_forest_score = models.FloatField()
+    isolation_forest_score = models.FloatField(
+        null=True,
+        blank=True,
+        help_text="Vide pour les anomalies détectées par règle (ex. FEEDER_OVERLOAD > 92 %)",
+    )
     forecasted_deficit_24h = models.FloatField(default=0.0, help_text="kWh")
     model_version = models.CharField(max_length=32, default="isoforest-v1")
 
@@ -277,8 +281,119 @@ class OnChainZKReceipt(models.Model):
     tx_hash = models.CharField(max_length=66, unique=True)
     block_number = models.PositiveIntegerField()
     network_name = models.CharField(max_length=32, default="Foundry-Anvil-Local")
-    is_verified_on_chain = models.BooleanField(default=True)
+    is_verified_on_chain = models.BooleanField(
+        default=False,
+        help_text="Passe à True seulement après confirmation par le contrat",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.tx_hash[:12]}… (bloc {self.block_number})"
+
+    
+
+
+# ---------------------------------------------------------------------------
+# 6. Migration 0002 : planning des pompes, règlement net-metering, crédit carbone
+# ---------------------------------------------------------------------------
+class PumpSchedule(models.Model):
+    """Planning de démarrage d'une pompe, proposé par l'agent (PumpPeakShavingOptimizerSkill)."""
+
+    class Status(models.TextChoices):
+        PROPOSED = "PROPOSED", "Proposé"
+        APPLIED = "APPLIED", "Appliqué"
+        CANCELLED = "CANCELLED", "Annulé"
+
+    node = models.ForeignKey(ResourceNodePlot, on_delete=models.CASCADE, related_name="pump_schedules")
+    agent_execution = models.ForeignKey(
+        AgentLoopExecution,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="pump_schedules",
+    )
+    start = models.DateTimeField()  # UTC
+    end = models.DateTimeField()  # UTC
+    planned_kw = models.FloatField(validators=[MinValueValidator(0)])
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.PROPOSED)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=Q(end__gt=F("start")), name="pump_schedule_end_after_start"),
+            models.CheckConstraint(condition=Q(planned_kw__gte=0), name="pump_schedule_kw_non_negative"),
+        ]
+        indexes = [
+            models.Index(fields=["node", "start"], name="pump_node_start_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.node_id} {self.start:%Y-%m-%d %H:%M} -> {self.end:%H:%M} ({self.planned_kw} kW)"
+
+
+class NetMeteringSettlement(models.Model):
+    """Règlement net-metering d'un nœud sur une période. Montants en millimes (entiers)."""
+
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "En attente"
+        SETTLED = "SETTLED", "Réglé"
+        FAILED = "FAILED", "Échec"
+
+    node = models.ForeignKey(ResourceNodePlot, on_delete=models.PROTECT, related_name="settlements")
+    period_start = models.DateTimeField()  # UTC
+    period_end = models.DateTimeField()  # UTC
+    imported_kwh = models.FloatField(validators=[MinValueValidator(0)])
+    exported_kwh = models.FloatField(validators=[MinValueValidator(0)])
+    import_cost_millimes = models.PositiveBigIntegerField()
+    export_credit_millimes = models.PositiveBigIntegerField()
+    net_amount_millimes = models.BigIntegerField(
+        help_text="Positif : le nœud paie. Négatif : le réseau paie le nœud."
+    )
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
+    zk_receipt = models.OneToOneField(
+        OnChainZKReceipt,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="settlement",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(period_end__gt=F("period_start")), name="settlement_end_after_start"
+            ),
+            models.UniqueConstraint(
+                fields=["node", "period_start", "period_end"], name="settlement_unique_node_period"
+            ),
+            models.CheckConstraint(
+                condition=Q(net_amount_millimes=F("import_cost_millimes") - F("export_credit_millimes")),
+                name="settlement_net_is_import_minus_export",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.node_id} {self.period_start:%Y-%m-%d} net={self.net_amount_millimes} millimes"
+
+
+class CarbonCredit(models.Model):
+    """Crédit carbone associé à un règlement. Le facteur d'émission utilisé est conservé."""
+
+    settlement = models.OneToOneField(
+        NetMeteringSettlement, on_delete=models.PROTECT, related_name="carbon_credit"
+    )
+    green_kwh = models.FloatField(validators=[MinValueValidator(0)])
+    co2_avoided_kg = models.FloatField(validators=[MinValueValidator(0)])
+    emission_factor_kg_per_kwh = models.FloatField(help_text="Facteur utilisé pour ce calcul (kg CO2/kWh)")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(emission_factor_kg_per_kwh__gt=0), name="carbon_factor_positive"
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.co2_avoided_kg:.1f} kg CO2 (règlement {self.settlement_id})"

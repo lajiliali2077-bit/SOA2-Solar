@@ -62,9 +62,9 @@ La **charge d'un feeder** n'est pas stockée : on la calcule en sommant la charg
 
 | Modèle | Champs | Contraintes et index |
 |---|---|---|
-| `AnomalyAndForecastEvent` | `node` (FK, null), `feeder` (FK, null), `reading_timestamp` (null), `detected_at` (auto), `anomaly_type`, `severity`, `isolation_forest_score`, `forecasted_deficit_24h` (kWh), `model_version` (défaut `isoforest-v1`) | au moins un de `node` ou `feeder` ; index `(severity, -detected_at)` |
+| `AnomalyAndForecastEvent` | `node` (FK, null), `feeder` (FK, null), `reading_timestamp` (null), `detected_at` (auto), `anomaly_type`, `severity`, `isolation_forest_score` (null, voir 0002), `forecasted_deficit_24h` (kWh), `model_version` (défaut `isoforest-v1`) | au moins un de `node` ou `feeder` ; index `(severity, -detected_at)` |
 | `AgentLoopExecution` | `thread_id` (index), `trigger_source`, `anomaly` (FK, null, SET_NULL), `status`, `retry_count`, `darja_transcript`, `parsed_intent_json`, `mcp_tools_invoked` (liste JSON), `skills_executed` (liste JSON), `final_recommendation`, `confidence_score` (0 à 1), `created_at` | |
-| `OnChainZKReceipt` | `agent_execution` (OneToOne, `related_name="zk_receipt"`), `zk_commitment_hash` (unique, 66), `public_inputs_json`, `tx_hash` (unique, 66), `block_number`, `network_name` (défaut `Foundry-Anvil-Local`), `is_verified_on_chain`, `created_at` | |
+| `OnChainZKReceipt` | `agent_execution` (OneToOne, `related_name="zk_receipt"`), `zk_commitment_hash` (unique, 66), `public_inputs_json`, `tx_hash` (unique, 66), `block_number`, `network_name` (défaut `Foundry-Anvil-Local`), `is_verified_on_chain` (défaut False, voir 0002), `created_at` | |
 
 - `Severity` : `LOW`, `MEDIUM`, `CRITICAL`.
 - `AnomalyType` : `FEEDER_OVERLOAD`, `VOLTAGE_OUT_OF_RANGE`, `INVERTER_FAILURE`, `PUMP_MISALIGNED`, `SOC_INCONSISTENT`.
@@ -145,6 +145,27 @@ classDiagram
         network_name
         is_verified_on_chain
     }
+    class PumpSchedule {
+        start
+        end
+        planned_kw
+        status
+    }
+    class NetMeteringSettlement {
+        period_start
+        period_end
+        imported_kwh
+        exported_kwh
+        import_cost_millimes
+        export_credit_millimes
+        net_amount_millimes
+        status
+    }
+    class CarbonCredit {
+        green_kwh
+        co2_avoided_kg
+        emission_factor_kg_per_kwh
+    }
 
     StakeholderUser "1" --> "*" ResourceNodePlot : owner
     CooperativeUnit "1" --> "*" ResourceNodePlot : nodes
@@ -154,6 +175,11 @@ classDiagram
     Feeder "1" --> "*" AnomalyAndForecastEvent : anomalies
     AnomalyAndForecastEvent "1" --> "*" AgentLoopExecution : agent_runs
     AgentLoopExecution "1" --> "0..1" OnChainZKReceipt : zk_receipt
+    ResourceNodePlot "1" --> "*" PumpSchedule : pump_schedules
+    AgentLoopExecution "1" --> "*" PumpSchedule : pump_schedules
+    ResourceNodePlot "1" --> "*" NetMeteringSettlement : settlements
+    NetMeteringSettlement "0..1" --> "0..1" OnChainZKReceipt : zk_receipt
+    NetMeteringSettlement "1" --> "0..1" CarbonCredit : carbon_credit
 ```
 
 `Tariff` n'a pas de relation : il est consulté par le calcul de facture selon l'heure et la date.
@@ -178,9 +204,50 @@ classDiagram
 
 - Le facteur d'émission du réseau tunisien (pour les crédits carbone) est une variable d'environnement, avec sa source citée dans le README.
 
-## Modèles ajoutés plus tard
+## Migration 0002 (Rôle 1)
 
-`PumpSchedule`, `NetMeteringSettlement`, `CarbonCredit` : ils seront ajoutés dans une **nouvelle migration** (`0002`), en référençant `ResourceNodePlot`. Ne renommez pas les modèles existants, pour ne pas obliger l'équipe à recréer sa base.
+Une seule migration regroupe tous les changements ci-dessous, pour que personne n'ait à refaire sa base deux fois. Ne renommez pas les modèles existants.
+
+### Changements sur des modèles existants
+
+| Modèle | Champ | Avant | Après |
+|---|---|---|---|
+| `AnomalyAndForecastEvent` | `isolation_forest_score` | obligatoire | `null=True, blank=True` : la règle déterministe FEEDER_OVERLOAD (> 92 %) n'a pas de score IsolationForest |
+| `OnChainZKReceipt` | `is_verified_on_chain` | défaut `True` | défaut `False` : un reçu n'est « vérifié » qu'après confirmation du contrat |
+
+Les types d'anomalie de nœud (`VOLTAGE_OUT_OF_RANGE`, `INVERTER_FAILURE`, `PUMP_MISALIGNED`, `SOC_INCONSISTENT`) et les sévérités existent déjà : aucun nouveau choix n'est ajouté.
+
+### Nouveaux modèles
+
+| Modèle | Champs | Contraintes et index |
+|---|---|---|
+| `PumpSchedule` (planning proposé par l'agent) | `node` (FK, CASCADE, `related_name="pump_schedules"`), `agent_execution` (FK, null, SET_NULL, `related_name="pump_schedules"`), `start` (UTC), `end` (UTC), `planned_kw` (Float), `status` (`PROPOSED`, `APPLIED`, `CANCELLED`, défaut `PROPOSED`), `created_at` | `end > start` ; `planned_kw >= 0` ; index `(node, start)` |
+| `NetMeteringSettlement` (règlement d'un nœud sur une période) | `node` (FK, PROTECT, `related_name="settlements"`), `period_start` (UTC), `period_end` (UTC), `imported_kwh`, `exported_kwh` (Float >= 0), `import_cost_millimes`, `export_credit_millimes` (entiers >= 0), `net_amount_millimes` (entier signé), `status` (`PENDING`, `SETTLED`, `FAILED`, défaut `PENDING`), `zk_receipt` (OneToOne vers `OnChainZKReceipt`, null, SET_NULL, `related_name="settlement"`), `created_at` | `period_end > period_start` ; unique `(node, period_start, period_end)` ; `net_amount_millimes = import_cost_millimes - export_credit_millimes` |
+| `CarbonCredit` (lié à un règlement) | `settlement` (OneToOne, PROTECT, `related_name="carbon_credit"`), `green_kwh` (Float >= 0), `co2_avoided_kg` (Float >= 0), `emission_factor_kg_per_kwh` (Float > 0, facteur utilisé), `created_at` | |
+
+Conventions :
+
+- `net_amount_millimes` > 0 : le nœud paie ; < 0 : le réseau paie le nœud (cohérent avec GRID_NET_KW : positif = import).
+- `emission_factor_kg_per_kwh` est copié dans la ligne au moment du calcul : le crédit reste reproductible même si la variable d'environnement change ensuite.
+- La coopérative et la période d'un crédit se retrouvent par `settlement.node.coop` et `settlement.period_*`. Le reçu on-chain d'un crédit se retrouve par `settlement.zk_receipt`.
+- Le unique `(node, period_start, period_end)` rend le règlement idempotent : un nouvel essai de l'agent ne crée pas de doublon.
+
+### Limite connue
+
+`OnChainZKReceipt.agent_execution` est un OneToOne : **un passage d'agent produit au plus un reçu, donc un règlement on-chain.** Régler plusieurs nœuds demande plusieurs passages. On ne change pas ce lien pour ne pas casser `execution.zk_receipt` côté dashboard.
+
+### Correspondance contrats d'interface et champs
+
+| Dictionnaire | Champ |
+|---|---|
+| `forecast_peak_load` : `forecasted_deficit_24h_kwh` | `AnomalyAndForecastEvent.forecasted_deficit_24h` |
+| `optimize_pump_schedule` : `schedules[].node_code`, `start`, `end`, `planned_kw` | `PumpSchedule.node` (via `node_code`), `start`, `end`, `planned_kw` |
+| `prove_green_origin` : `commitment_hash`, `public_inputs` | `OnChainZKReceipt.zk_commitment_hash`, `public_inputs_json` |
+| `settle_on_chain` : `tx_hash`, `block_number`, `network_name`, `is_verified` | `OnChainZKReceipt.tx_hash`, `block_number`, `network_name`, `is_verified_on_chain` |
+
+### À confirmer par le groupe : qui écrit quoi
+
+Proposition (non encore validée) : le Rôle 2 fournit le calcul du règlement (`billing.py`), le Rôle 5 fournit le calcul du CO2 évité (facteur lu dans `.env`), et le Rôle 4 (agent) écrit en base `NetMeteringSettlement`, `CarbonCredit` et `OnChainZKReceipt`. Les signatures de ces deux fonctions de calcul sont à fixer entre les rôles concernés.
 
 ## Anciens noms du starter (Track 1) vers le Track 7
 
