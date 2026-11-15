@@ -18,7 +18,7 @@ Les modèles de données sont décrits dans `docs/models.md`.
 
 | Fonction | Propriétaire | Fichier | Statut |
 |---|---|---|---|
-| `forecast_peak_load` | Rôle 1 | `agent/skills/irradiance_forecaster.py` | stub dans `main` |
+| `forecast_peak_load` | Rôle 1 | `agent/skills/irradiance_forecaster.py` | réel (profil médian)
 | `optimize_pump_schedule` | Rôle 4 | `agent/skills/pump_optimizer.py` | à pousser (stub d'abord) |
 | `prove_green_origin` | Rôle 5 | `agent/skills/zk_origin_prover.py` | à pousser (stub d'abord) |
 | `settle_on_chain` | Rôle 5 | `contracts/web3_zk_client.py` | à pousser (stub d'abord) |
@@ -38,7 +38,7 @@ Chaque propriétaire met la colonne « Statut » à jour (« stub », puis « r�
   "forecasted_deficit_24h_kwh": 3.4,   # kWh au-dessus de 92 % de la capacité (définition à confirmer avec les Rôles 2 et 4)
 }
 ```
-`load_kw` est la charge nette du feeder (somme des `GRID_NET_KW`). Un stub doit rester plausible : au-dessus de 92 % pour `Feeder-TOZ-01`, sous 92 % pour les autres feeders. Sinon l'agent n'a rien à corriger.
+`load_kw` est le **pic de charge nette de l'heure** (maximum des 4 pas de 15 minutes ; charge nette = somme des `GRID_NET_KW` du feeder). `generation_kw` est la production moyenne de l'heure. `forecasted_deficit_24h_kwh` est calculé sur les pas de 15 minutes : énergie au-dessus de 92 % de `capacity_kw`. Les heures (`hour`) sont en UTC : la surcharge de Tozeur tombe vers 18h-19h UTC. Résultats attendus avec les données de démo : `Feeder-TOZ-01` environ 98 % et 3,9 kWh de déficit, les autres feeders sous 72 % et déficit 0.
 
 ### 2.2 `optimize_pump_schedule(feeder_id: int, forecast: dict) -> dict`
 
