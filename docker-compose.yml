@@ -1,4 +1,13 @@
-version: '3.9'
+# Base partagée par les services construits depuis le Dockerfile.
+# .env (racine, jamais commité) est lu s'il existe ; DATABASE_URL est ensuite forcée vers
+# le conteneur "db" (dans un conteneur, "localhost" désignerait le conteneur lui-même).
+x-app: &app
+  build: .
+  env_file:
+    - path: .env
+      required: false
+  environment:
+    DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-tunisovereign_db}
 
 services:
   db:
@@ -11,39 +20,46 @@ services:
       - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-tunisovereign_db}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
 
   anvil-blockchain:
     image: ghcr.io/foundry-rs/foundry:latest
     entrypoint: ["anvil", "--host", "0.0.0.0", "--port", "8545", "--block-time", "2"]
     ports:
-      - "8545:8545"
+      - "127.0.0.1:8545:8545"
 
   dashboard:
-    build: .
+    <<: *app
     command: streamlit run dashboard/streamlit_command_center.py --server.port 8501 --server.address 0.0.0.0
-    env_file:
-      - .env.example
     ports:
-      - "8501:8501"
+      - "127.0.0.1:8501:8501"
     depends_on:
-      - db
-      - redis
-      - anvil-blockchain
+      db:
+        condition: service_healthy
+      anvil-blockchain:
+        condition: service_started
 
   n8n-boundary:
     image: docker.n8n.io/n8nio/n8n:latest
     environment:
       - N8N_PORT=5678
       - GENERIC_TIMEZONE=Africa/Tunis
+      - TZ=Africa/Tunis
     ports:
-      - "5678:5678"
+      - "127.0.0.1:5678:5678"
     volumes:
-      - ./workflows:/home/node/.n8n/workflows
+      - n8n_data:/home/node/.n8n
+      - ./workflows:/workflows:ro
 
 volumes:
   pgdata:
+  n8n_data:
