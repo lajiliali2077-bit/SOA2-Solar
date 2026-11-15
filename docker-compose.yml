@@ -1,13 +1,15 @@
-# Base partagée par les services construits depuis le Dockerfile.
+# Base partagée par les services construits depuis le Dockerfile (une seule image).
 # .env (racine, jamais commité) est lu s'il existe ; DATABASE_URL est ensuite forcée vers
 # le conteneur "db" (dans un conteneur, "localhost" désignerait le conteneur lui-même).
 x-app: &app
   build: .
+  image: solarsouk-app
   env_file:
     - path: .env
       required: false
   environment:
     DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-tunisovereign_db}
+    ALLOWED_HOSTS: localhost,127.0.0.1,web
 
 services:
   db:
@@ -36,6 +38,47 @@ services:
     entrypoint: ["anvil", "--host", "0.0.0.0", "--port", "8545", "--block-time", "2"]
     ports:
       - "127.0.0.1:8545:8545"
+
+  # Tâche unique : applique les migrations puis le seed (idempotents), et se termine.
+  init:
+    <<: *app
+    command: sh -c "python backend/manage.py migrate --noinput && python backend/manage.py seed_solarsouk"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    <<: *app
+    command: python backend/manage.py runserver 0.0.0.0:8000
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      init:
+        condition: service_completed_successfully
+
+  grpc:
+    <<: *app
+    command: python grpc_service/server.py
+    ports:
+      - "127.0.0.1:50051:50051"
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('localhost', 50051), 2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  # Données de démo : docker compose run --rm simulate
+  simulate:
+    <<: *app
+    profiles: ["demo"]
+    command: sh -c "python simulator/tunisian_simulator.py --days 7 --clear --target grpc:50051 && python backend/manage.py detect_anomalies --clear"
+    depends_on:
+      grpc:
+        condition: service_healthy
 
   dashboard:
     <<: *app
