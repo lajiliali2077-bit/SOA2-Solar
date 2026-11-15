@@ -8,8 +8,14 @@ Event = AnomalyAndForecastEvent
 
 class Command(BaseCommand):
     help = "Détecte les surcharges de feeders et les enregistre comme événements (idempotent)."
-
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--clear", action="store_true",
+            help="supprime tous les événements avant de détecter",
+        )
     def handle(self, *args, **options):
+        if options["clear"]:
+            print("Événements supprimés :", Event.objects.all().delete())
         load, _truth, capacity = load_feeder_loads()  # la vérité terrain n'est pas utilisée ici
 
         detected = created = 0
