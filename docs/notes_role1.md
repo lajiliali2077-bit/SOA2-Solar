@@ -24,13 +24,18 @@ Journal de travail pour les slides et la défense orale individuelle.
 - [x] 1a. Spec de la migration 0002 dans `docs/models.md`
 - [x] 1b. `models.py` et migration 0002 (appliquée et testée en local)
 - [x] 2a. Stub de `forecast_peak_load` (contrat d'interface respecté, tests automatisés)
-- [ ] 2b. Vrai modèle de prévision (profil horaire moyen des jours précédents + ajustement)
+- [x] 2b. Vrai modèle de prévision (profil horaire moyen des jours précédents + ajustement)
 - [ ] 3. Anomalies de nœud (IsolationForest) : type, sévérité, enregistrement dans `detect_anomalies`
 - [ ] 4. gRPC : `run_agent` sur anomalie CRITICAL, branchement de `TriggerUrgentAudit`
 - [ ] 5. Docker : Dockerfile en Python 3.14, `.dockerignore`, service de l'application, README (facteur d'émission sourcé, tarifs signalés non officiels)
 - [ ] 6. UML de classes (Mermaid), diagramme de séquence, schéma d'architecture, assemblage des slides et de la vidéo, fusion dans `main`
 
 ## Journal (le plus récent en haut)
+
+## 2.b :
+- Fait : prévision par profil médian au pas de 15 minutes, avec 12 tests sans base de données.
+- Pourquoi la médiane : elle résiste aux valeurs aberrantes. Pourquoi le pas de 15 minutes : la moyenne horaire noie le pic de Tozeur.
+- Limite connue : pas d’ajustement de tendance, et pas de test sur la lecture de la base (feeder inconnu, nœud sans mesures).
 
 ### Incrément 3 : stub de forecast_peak_load (2026-11-14, branche role1-data)
 - Fait : création de `agent/skills/irradiance_forecaster.py` avec la signature du contrat d'interface, et de ses 8 tests unittest. Le stub ne lit pas la base : il renvoie un profil déterministe sur 24 h (production solaire en cloche, pic de consommation en soirée à 96 % d'une capacité supposée de 100 kW).
