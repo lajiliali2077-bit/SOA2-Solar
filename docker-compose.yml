@@ -10,6 +10,11 @@ x-app: &app
   environment:
     DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-tunisovereign_db}
     ALLOWED_HOSTS: localhost,127.0.0.1,web
+    # Dans un conteneur, "localhost" est le conteneur lui-même : on pointe vers les autres services.
+    POSTGRES_HOST: db
+    REDIS_URL: redis://redis:6379/0
+    WEB3_RPC_URL: http://anvil-blockchain:8545
+    OLLAMA_BASE_URL: http://host.docker.internal:11434
 
 services:
   db:
