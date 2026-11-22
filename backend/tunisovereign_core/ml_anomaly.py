@@ -19,6 +19,20 @@ from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_
 UTC_OFFSET_H = 1  # Tunisie : UTC+1 toute l'année (la base stocke en UTC)
 REQUIRED_METRICS = ("GENERATION_KW", "PUMP_LOAD_KW", "VOLTAGE_V", "GRID_NET_KW")
 FEATURE_NAMES = ["gen_ratio", "soc_pct", "pump_ratio", "voltage_v", "net_ratio", "hour_sin", "hour_cos"]
+ML_MODEL_VERSION = "isoforest-v1"  # valeur par défaut de AnomalyAndForecastEvent.model_version
+CRITICAL_SHARE = 0.10  # parmi les anomalies détectées : 10 % les plus extrêmes -> CRITICAL
+MEDIUM_SHARE = 0.30    # les 30 % suivants -> MEDIUM, le reste -> LOW
+VOLTAGE_MIN, VOLTAGE_MAX = 220 * 0.94, 220 * 1.06  # 220 V ± 6 %
+SOLAR_WINDOW = (10, 15)  # heures locales : fenêtre solaire de pompage (10h-15h)
+SOC_MIN_PCT = 10.0       # le simulateur ne descend jamais sous 10 % : en dessous = incohérent
+# Pour le repli (aucune règle ne s'applique) : colonne de X la plus atypique -> type d'anomalie
+FALLBACK_TYPE_BY_FEATURE = {
+    0: "INVERTER_FAILURE",     # production anormale
+    1: "SOC_INCONSISTENT",     # batterie
+    2: "PUMP_MISALIGNED",      # pompe
+    3: "VOLTAGE_OUT_OF_RANGE", # tension
+    4: "INVERTER_FAILURE",     # puissance réseau anormale
+}
 
 
 def load_dataset():
@@ -131,6 +145,74 @@ class TunisianTelemetryAnomalyEngine:
             "recall": round(float(recall_score(y, y_pred, zero_division=0)), 4),
             "f1_score": round(float(f1_score(y, y_pred, zero_division=0)), 4),
         }
+
+    def detect_node_anomalies_from_db(self) -> list:
+        """Détecte les mesures de nœud inhabituelles (sans utiliser la vérité terrain).
+
+        Retourne une liste de dictionnaires, triée par instant :
+          node_id, timestamp, score (plus négatif = plus anormal),
+          anomaly_type (nom d'un AnomalyType), severity (LOW / MEDIUM / CRITICAL)
+        """
+        rows, nodes = load_dataset()
+        X, _y, keys = build_matrix(rows, nodes)  # _y ignoré : jamais utilisé pour détecter
+        if len(keys) == 0:
+            raise ValueError("Aucune télémétrie complète en base : lancez le simulateur d'abord.")
+
+        flags = self.model.fit_predict(X)          # -1 = anomalie
+        scores = self.model.score_samples(X)       # plus petit = plus anormal
+        flagged = [i for i in range(len(keys)) if flags[i] == -1]
+        if not flagged:
+            return []
+
+        # Gravité par rang : les plus extrêmes sont CRITICAL, puis MEDIUM, puis LOW
+        flagged.sort(key=lambda i: scores[i])
+        n_critical = max(1, round(len(flagged) * CRITICAL_SHARE))
+        n_medium = round(len(flagged) * MEDIUM_SHARE)
+
+        mean, std = X.mean(axis=0), X.std(axis=0) + 1e-9
+        results = []
+        for rank, i in enumerate(flagged):
+            node_id, ts = keys[i]
+            if rank < n_critical:
+                severity = "CRITICAL"
+            elif rank < n_critical + n_medium:
+                severity = "MEDIUM"
+            else:
+                severity = "LOW"
+            results.append({
+                "node_id": node_id,
+                "timestamp": ts,
+                "score": float(scores[i]),
+                "anomaly_type": classify_node_anomaly(
+                    rows[keys[i]]["v"], nodes[node_id], ts, (X[i] - mean) / std
+                ),
+                "severity": severity,
+            })
+        results.sort(key=lambda r: (r["timestamp"], r["node_id"]))
+        return results
+
+
+def classify_node_anomaly(values, node, ts, zscores):
+    """Donne un type d'anomalie à une mesure déjà jugée atypique (règles lisibles d'abord).
+
+    Retourne le NOM d'un AnomalyType (ex. "VOLTAGE_OUT_OF_RANGE").
+    """
+    hour = (ts.hour + ts.minute / 60 + UTC_OFFSET_H) % 24
+    in_solar_window = SOLAR_WINDOW[0] <= hour < SOLAR_WINDOW[1]
+
+    if not VOLTAGE_MIN <= values["VOLTAGE_V"] <= VOLTAGE_MAX:
+        return "VOLTAGE_OUT_OF_RANGE"
+    soc = values.get("BATTERY_SOC")
+    if soc is not None and not SOC_MIN_PCT <= soc <= 100:
+        return "SOC_INCONSISTENT"
+    if in_solar_window and node.installed_kwp > 0 and values["GENERATION_KW"] / node.installed_kwp < 0.05:
+        return "INVERTER_FAILURE"  # pas de production en plein soleil
+    if node.pump_rated_kw > 0 and values["PUMP_LOAD_KW"] / node.pump_rated_kw > 0.1 and not in_solar_window:
+        return "PUMP_MISALIGNED"   # pompe en marche hors fenêtre solaire
+
+    # Repli : la caractéristique la plus éloignée de la normale décide du type
+    worst = int(np.argmax(np.abs(zscores[:5])))
+    return FALLBACK_TYPE_BY_FEATURE[worst]
 
 
 if __name__ == "__main__":
