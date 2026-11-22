@@ -1,4 +1,4 @@
-# ☀️ SolarSouk-STEG — Rapport d’avancement, Semaine 1
+# ☀️ SolarSouk-STEG — Rapport d’avancement, Semaines 1 et 2
 
 > **Projet DS2 · SOA · Track 7 · 3 BI 1 · ISGT**
 > Plateforme de micro-réseau solaire pour fermes et PME en zones arides.
@@ -8,12 +8,90 @@
 | **Projet** | SolarSouk-STEG (Track 7), plateforme de micro-réseau solaire pour fermes et PME |
 | **Cours** | SOA — DS2, Track 7 |
 | **Classe** | 3 BI 1 · ISGT |
-| **Période couverte** | Semaine 1 (sur 4) |
+| **Période couverte** | Semaines 1 et 2 (sur 4) |
 | **Équipe** | Ali Lajili (Rôle 1) · Mohamed Mahmoudi (Rôle 2) · Adem Ouerfelli (Rôle 3) · Mouin Ziadi (Rôle 4) · Mahdi Hamrouni (Rôle 5) |
 | **Énoncé officiel** | DS2 2026–2027 « TuniSovereign-AI », Chaouki Bayoudhi (ISG Tunis) |
 | **Remise et soutenances** | Fin de la Semaine 4 ; soutenances individuelles en classe ensuite |
 
+## 🆕 Avancement de la Semaine 2
+
+**Légende :** ✅ fait · 🟡 partiel · ⬜ à faire
+
+**Période :** *[À COMPLÉTER : dates de la Semaine 2]*
+
+> Ce document se lit en deux parties. La **Partie A** (cette section) présente l’avancement de la Semaine 2. La **Partie B** (sommaire ci-dessous) reprend le rapport complet : l’état de la Semaine 1 et, signalés « Semaine 2 », les compléments techniques ajoutés depuis.
+
+### S2.1 Résumé de la semaine
+
+Le **Rôle 1** a terminé la couche « données et détection » : les anomalies de nœud repérées par l’IsolationForest sont enregistrées en base avec un type et une sévérité (**202 événements**, en plus des 42 surcharges de feeder, soit **244 événements**), la performance du modèle est mesurée (**F1 = 0,83**) et l’agent du Rôle 4 est déclenché automatiquement sur les incidents critiques dès qu’il existe. Ce README est mis à jour, avec le facteur d’émission sourcé et les tarifs signalés comme fictifs. Pour les **Rôles 2 à 5** : *[À COMPLÉTER : une ou deux phrases par rôle]*.
+
+### S2.2 Tableau d’avancement par rôle
+
+| Rôle | Fait cette semaine | En cours | Prévu en Semaine 3 |
+|---|---|---|---|
+| **1 — Ali** | Détection d’anomalies complète : 202 anomalies de nœud enregistrées avec type et sévérité, F1 mesuré à 0,83 ; déclenchement automatique de l’agent sur les incidents `CRITICAL` (`agent_trigger.py`) ; README ; rapport mis à jour ; travail sauvegardé dans Git | Diagrammes UML de classes et de séquence, schéma d’architecture | Test de bout en bout avec l’agent du Rôle 4 ; compléter ce README avec les parties des autres rôles ; slides ; fusion des branches dans `main` |
+| **2 — Mohamed** | *[À COMPLÉTER]* | *[À COMPLÉTER]* | *[À COMPLÉTER]* |
+| **3 — Adem** | *[À COMPLÉTER]* | *[À COMPLÉTER]* | *[À COMPLÉTER]* |
+| **4 — Mouin** | *[À COMPLÉTER]* | *[À COMPLÉTER]* | *[À COMPLÉTER]* |
+| **5 — Mahdi** | *[À COMPLÉTER]* | *[À COMPLÉTER]* | *[À COMPLÉTER]* |
+
+### S2.3 Détail par rôle
+
+**Rôle 1 — Ali.** Cette semaine, j’ai terminé la détection d’anomalies. Le modèle IsolationForest signale les mesures de nœud inhabituelles ; chacune est enregistrée dans `AnomalyAndForecastEvent` avec son score, son type (tension, onduleur, pompe ou batterie, déduit de règles lisibles) et sa sévérité (les 10 % les plus extrêmes sont `CRITICAL`, les 30 % suivantes `MEDIUM`, le reste `LOW`). La commande `detect_anomalies` est idempotente : la relancer ne crée pas de doublons. Sur les données simulées, elle donne 42 surcharges feeder (précision et rappel de 1,0) et 202 anomalies de nœud (précision 0,88, rappel 0,79, F1 = 0,83). J’ai ensuite écrit le module `agent_trigger.py` : il lance `run_agent` sur les incidents `CRITICAL`, une seule fois par incident (nœud ou feeder et jour), sans relancer un incident déjà traité, et sans planter tant que l’agent n’existe pas (§ 4.12). Fichiers : `ml_anomaly.py` et `detect_anomalies.py` (modifiés), `agent_trigger.py` et `README.md` (nouveaux). Difficultés et choix : `models.py` ne propose que quatre types d’anomalie pour les nœuds, d’où des règles de classement ; le grand nombre de `PUMP_MISALIGNED` vient des pompes de Tozeur qui tournent le soir pendant la surcharge (§ 4.7). Prochaines étapes : diagrammes, test avec l’agent du Rôle 4, slides.
+
+**Rôle 2 — Mohamed.** *[À RÉDIGER : ce qui a été fait (facturation, endpoints de règlement et de planning, point d’accès darija, serveur MCP), fichiers modifiés ou créés, tests réalisés, difficultés, prochaines étapes.]*
+
+**Rôle 3 — Adem.** *[À RÉDIGER : ce qui a été fait (GraphQL, CSRF, dashboard Streamlit, workflow n8n), fichiers modifiés ou créés, tests réalisés, difficultés, prochaines étapes.]*
+
+**Rôle 4 — Mouin.** *[À RÉDIGER : ce qui a été fait (agent LangGraph, optimiseur de pompes, skill darija, stub de `optimize_pump_schedule`), fichiers modifiés ou créés, tests réalisés, difficultés, prochaines étapes. Rappel : `run_agent` doit retourner l’identifiant de l’`AgentLoopExecution` créée.]*
+
+**Rôle 5 — Mahdi.** *[À RÉDIGER : ce qui a été fait (contrat Solidity, preuve ZK, crédits carbone, stubs de `prove_green_origin` et `settle_on_chain`), fichiers modifiés ou créés, tests réalisés, difficultés, prochaines étapes.]*
+
+### S2.4 Résultats de contrôle (Rôle 1)
+
+| Contrôle | Résultat obtenu |
+|---|---|
+| Surcharges feeder (règle > 92 %) | 42 détectées ; précision 1,0, rappel 1,0 |
+| Anomalies de nœud (IsolationForest) | 202 détectées ; précision 0,88, rappel 0,79, F1 = 0,83 |
+| Répartition par type | `PUMP_MISALIGNED` 130 · `INVERTER_FAILURE` 29 · `SOC_INCONSISTENT` 28 · `VOLTAGE_OUT_OF_RANGE` 15 |
+| Répartition par sévérité (nœuds) | `LOW` 121 · `MEDIUM` 61 · `CRITICAL` 20 (plus 42 `CRITICAL` de surcharge feeder) |
+| Total d’événements en base | 244 (42 + 202) |
+| Déclenchement de l’agent | *[À COMPLÉTER : coller le message affiché par la commande. Tant que `run_agent` n’existe pas, le message attendu indique « Agent non connecté (Rôle 4) » et le nombre d’incidents `CRITICAL` en attente.]* |
+
+Commandes de contrôle : [Annexe C, étape 4](#annexe-c--reproduire-les-résultats). *[À COMPLÉTER : insérer les captures d’écran.]*
+
+### S2.5 Couverture du barème (mise à jour)
+
+| Critère | Points | Fin de la Semaine 1 | Fin de la Semaine 2 |
+|---|---|---|---|
+| Backend REST + GraphQL + gRPC | 3,5 | 🟡 gRPC fait ; REST et GraphQL à réécrire | 🟡 gRPC fait, avec déclenchement automatique de l’agent ; REST : *[À COMPLÉTER Rôle 2]* ; GraphQL : *[À COMPLÉTER Rôle 3]* |
+| Modèles, UML, authentification, rôles | 2,5 | 🟡 Modèles et comptes faits ; UML, JWT et permissions à faire | 🟡 Modèles et comptes faits ; UML de classes et de séquence : en cours (Rôle 1) ; JWT et permissions : *[À COMPLÉTER Rôle 2]* |
+| Simulateur + ML | 2 | 🟡 Fait ; évaluation à documenter | ✅ Fait ; évaluation documentée (IsolationForest F1 = 0,83, règle feeder F1 = 1,0) ; anomalies enregistrées avec type et sévérité |
+| Agent, MCP, Skills | 4 | 🟡 1 skill sur 3 faite (prévision) ; le reste à faire | 🟡 Skill de prévision faite ; déclenchement automatique de l’agent prêt ; agent, MCP et optimiseur : *[À COMPLÉTER Rôles 2 et 4]* |
+| Blockchain + ZK | 1,5 | ⬜ À faire | *[À COMPLÉTER Rôle 5]* |
+| Dashboard, n8n, Docker, README | 1,5 | 🟡 Docker fait ; le reste à faire | 🟡 Docker et README faits ; dashboard et n8n : *[À COMPLÉTER Rôle 3]* |
+| Défense orale individuelle | 5 | 🟡 Préparation en continu | 🟡 Questions de défense du Rôle 1 ajoutées (§ 8) ; journaux de rôle à tenir à jour par chacun |
+
+### S2.6 Décisions, risques et dépendances
+
+- **Facteur d’émission du réseau tunisien :** valeur proposée **0,468 kgCO₂/kWh** (moyenne IEA relevée dans le rapport EPIC Deploy sur la Tunisie, 2026) ; alternative 0,483 (Electricity Maps 2025). À revérifier à la source IEA avant la remise finale, à valider par l’équipe, puis à communiquer au Rôle 5 (lecture dans `.env`).
+- **Seuil de 92 % :** il vient de l’énoncé (tableau des seuils, Track 7) ; aucune norme externe ne le fixe (§ 4.7).
+- **Dépendance :** l’agent du Rôle 4 doit exposer `run_agent(anomaly_id)` et retourner l’identifiant de l’`AgentLoopExecution` créée ; c’est ce qu’attendent le serveur gRPC et `agent_trigger.py`.
+- *[À COMPLÉTER : autres risques, blocages et décisions de la semaine, pour les Rôles 2 à 5.]*
+
+### S2.7 Prévu pour la Semaine 3
+
+Voir aussi le planning du [§ 7.3](#73-planning-peut-changer). **Rôle 1 :** diagrammes UML et d’architecture terminés, test de bout en bout avec l’agent, README complété avec les parties des autres rôles, slides. **Rôles 2 à 5 :** *[À COMPLÉTER]*.
+
+---
+
+# Partie B — Rapport complet
+
 ## 📑 Sommaire
+
+**Partie A — Avancement de la Semaine 2** (juste au-dessus) : [aller à la section](#-avancement-de-la-semaine-2)
+
+**Partie B — Rapport complet** (état de la Semaine 1, avec les compléments marqués « Semaine 2 ») :
 
 1. [Résumé](#1-résumé)
 2. [Comprendre le projet](#2-comprendre-le-projet)
@@ -28,6 +106,8 @@
 ---
 
 ## 1. Résumé
+
+> Ce résumé décrit l’état de la **Semaine 1**. L’avancement de la **Semaine 2** est présenté en tête de document.
 
 SolarSouk-STEG est une plateforme de micro-réseau solaire destinée à des fermes et PME de quatre gouvernorats : **Tozeur, Kébili, Tataouine et Sfax**. Elle poursuit trois objectifs :
 
@@ -56,7 +136,7 @@ SolarSouk-STEG est une plateforme de micro-réseau solaire destinée à des ferm
 
 ### 2.1 Le problème
 
-En été, les fermes des zones arides démarrent leurs pompes d’irrigation aux mêmes heures. Le **feeder** (le départ électrique qui alimente un groupe de clients) dépasse alors sa capacité et la coupure survient. Dans nos données simulées, la pointe de Tozeur a lieu chaque jour entre **19 h et 20 h 15 UTC** (soit 20 h – 21 h 15 à Tunis).
+En été, les fermes des zones arides démarrent leurs pompes d’irrigation aux mêmes heures. Le **feeder** (le départ électrique qui alimente un groupe de clients) dépasse alors sa capacité et la coupure survient. Dans nos données simulées, la pointe de Tozeur a lieu chaque jour entre **19 h et 20 h 15, heure de Tunis** (soit 18 h – 19 h 15 UTC).
 
 Trois manques sont visés :
 
@@ -215,12 +295,35 @@ La commande est **rejouable** : elle efface puis régénère les données, ce qu
 
 | Méthode | Principe | Résultat |
 |---|---|---|
-| **Règle de surcharge** | Un feeder dont la charge dépasse 92 % de sa capacité (seuil indiqué par l’énoncé pour le Track 7) déclenche un événement `FEEDER_OVERLOAD` de sévérité `CRITICAL`. Transparente et facile à justifier. | 42 événements sur le feeder de Tozeur |
-| **Modèle IsolationForest** (scikit-learn) | Repère les mesures de nœud « inhabituelles » sans qu’on lui dise ce qu’est une anomalie. | F1 ≈ 0,85 sur données simulées (bon score, mais voir § 6) |
+| **Règle de surcharge** | Un feeder dont la charge dépasse 92 % de sa capacité (seuil indiqué par l’énoncé pour le Track 7) déclenche un événement `FEEDER_OVERLOAD` de sévérité `CRITICAL`. Transparente et facile à justifier. | 42 événements sur le feeder de Tozeur ; précision et rappel de 1,0 (Semaine 2) |
+| **Modèle IsolationForest** (scikit-learn) | Repère les mesures de nœud « inhabituelles » sans qu’on lui dise ce qu’est une anomalie. | F1 ≈ 0,85 estimé en Semaine 1 ; **mesuré en Semaine 2 : F1 = 0,83** (précision 0,88, rappel 0,79), voir ci-dessous et § 6 |
 
 > **En clair.** L’IsolationForest fonctionne comme un jeu de « Où est Charlie ? » : un point atypique est isolé en très peu de questions, un point normal en demande beaucoup. Le score F1 (de 0 à 1) mesure à la fois les anomalies trouvées et le peu de fausses alertes.
 
 **Pourquoi deux méthodes ?** La règle couvre le risque métier central (la surcharge) de façon explicable ; le ML couvre les comportements anormaux que personne n’avait prévus.
+
+**Compléments de la Semaine 2.**
+
+- **Évaluation mesurée.** Sur 6 720 lignes « nœud × instant », le simulateur a injecté 224 anomalies ; l’IsolationForest en signale 202, dont 177 correctes (25 fausses alertes, 47 anomalies manquées) : précision 0,88, rappel 0,79, **F1 = 0,83**. La règle de surcharge retrouve les 42 instants injectés, sans fausse alerte.
+- **Enregistrement en base.** La commande `detect_anomalies` enregistre chaque anomalie de nœud dans `AnomalyAndForecastEvent` avec le nœud, l’horodatage, le score de l’IsolationForest et la version du modèle (`isoforest-v1`). Elle est **idempotente** : la relancer ne crée pas de doublons. Résultat : **244 événements**, dont 42 surcharges feeder (`rule-overload-v1`) et 202 anomalies de nœud.
+- **Type attribué.** Le modèle dit seulement qu’une mesure est inhabituelle ; le type est ensuite donné par des règles lisibles :
+
+| Type | Règle |
+|---|---|
+| `VOLTAGE_OUT_OF_RANGE` | Tension hors de 220 V ± 6 % |
+| `SOC_INCONSISTENT` | Batterie sous 10 % (le simulateur ne descend jamais plus bas) |
+| `INVERTER_FAILURE` | Production quasi nulle entre 10 h et 15 h |
+| `PUMP_MISALIGNED` | Pompe en marche hors de la fenêtre solaire 10 h–15 h |
+
+  Si aucune règle ne s’applique, la mesure la plus éloignée de la normale décide.
+- **Sévérité.** Parmi les anomalies de nœud, les 10 % les plus extrêmes (score le plus bas) sont `CRITICAL`, les 30 % suivantes `MEDIUM`, le reste `LOW`. Toutes les surcharges feeder sont `CRITICAL`.
+
+| Répartition (anomalies de nœud) | Nombre |
+|---|---|
+| Par type | `PUMP_MISALIGNED` 130 · `INVERTER_FAILURE` 29 · `SOC_INCONSISTENT` 28 · `VOLTAGE_OUT_OF_RANGE` 15 |
+| Par sévérité | `LOW` 121 · `MEDIUM` 61 · `CRITICAL` 20 |
+
+> **Pourquoi tant de `PUMP_MISALIGNED` ?** Pendant la surcharge de Tozeur, les pompes démarrent en soirée. L’IsolationForest signale aussi ces nœuds et la règle les étiquette `PUMP_MISALIGNED`. Ce n’est pas une erreur : la pompe tourne bien hors de la fenêtre solaire.
 
 ### 4.8 Prévision de pointe de charge
 
@@ -274,6 +377,19 @@ n8n (outil d’automatisation de workflows) n’intervient qu’aux **frontière
 - **En sortie :** quand une anomalie `CRITICAL` est détectée ou qu’un reçu blockchain est ancré, Django envoie un webhook à n8n, qui diffuse l’alerte (Telegram ou SMS) et un reçu d’audit.
 - **En entrée (optionnel) :** un workflow planifié de n8n peut récupérer l’irradiance auprès de l’API gratuite Open-Meteo et la transmettre à Django, ce qui lèverait la limite « pas de météo réelle » (§ 6).
 
+### 4.12 Déclenchement automatique de l’agent (ajouté en Semaine 2)
+
+Après la détection, la commande `detect_anomalies` appelle le module `agent_trigger.py`, qui lance `run_agent(anomaly_id)` (Rôle 4) sur les anomalies `CRITICAL`.
+
+| Règle | Effet |
+|---|---|
+| **Un lancement par incident** | Un incident regroupe les anomalies `CRITICAL` d’un même nœud (ou feeder) le même jour : 62 anomalies `CRITICAL` ne donnent pas 62 exécutions. |
+| **Idempotent** | Un incident déjà traité (une `AgentLoopExecution` existe) n’est jamais relancé. |
+| **Bornée** | Les incidents les plus récents passent en premier, dans la limite de 5 exécutions par lancement (`--max-agent-runs`) ; `--no-agent` désactive le déclenchement. |
+| **Sans plantage** | Tant que l’agent n’existe pas, un message indique le nombre d’incidents `CRITICAL` en attente. |
+
+Le contrat attend de `run_agent` l’**identifiant de l’`AgentLoopExecution`** créée. La méthode gRPC `TriggerUrgentAudit` (déclenchement à la demande, § 4.5) reste inchangée.
+
 ---
 
 ## 5. Réalisations de la Semaine 1
@@ -302,6 +418,8 @@ n8n (outil d’automatisation de workflows) n’intervient qu’aux **frontière
 | 4. gRPC et déclenchement de l’agent | 🟡 Partiel | `TriggerUrgentAudit` branché sur `run_agent`, en attente de l’agent. Déclenchement automatique sur anomalie `CRITICAL` : à confirmer |
 | 5. Docker et README | 🟡 Partiel | Dockerfile et compose corrigés, démarrage vérifié. README (facteur d’émission sourcé, tarifs signalés comme non officiels) : à faire |
 | 6. Documentation | 🟡 Partiel | `models.md`, `contrats_interfaces.md`, `notes_role1.md`. UML, séquence, architecture, slides, vidéo : à faire |
+
+> **Note.** Tableau à l’état de la fin de la Semaine 1. La mise à jour est dans l’[avancement de la Semaine 2](#-avancement-de-la-semaine-2).
 
 ### 5.3 Rôle 2 — Mohamed
 
@@ -343,6 +461,8 @@ Trois contrôles permettent à n’importe quel membre de vérifier que son envi
 | Données de démonstration | La simulation affiche `accepted_count = 33600 / 33600`, puis « 42 événement(s) en base » |
 | Accès depuis l’environnement Python | Le comptage en base renvoie 33 600 mesures et 42 événements |
 
+> **Note.** Contrôles à l’état de la Semaine 1 (42 événements). Depuis la Semaine 2, la base contient **244 événements** (42 surcharges feeder et 202 anomalies de nœud).
+
 ### 5.8 Couverture du barème
 
 | Critère | Points | État | Situation à ce jour |
@@ -358,17 +478,20 @@ Trois contrôles permettent à n’importe quel membre de vérifier que son envi
 
 Détail critère par critère, avec les écarts à l’énoncé officiel : [Annexe D](#annexe-d--conformité-à-lénoncé-officiel-track-7).
 
+> **Note.** Barème à l’état de la fin de la Semaine 1. La mise à jour est dans l’[avancement de la Semaine 2](#-avancement-de-la-semaine-2).
+
 ---
 
 ## 6. Limites connues et risques
 
 | Risque | Explication | Parade |
 |---|---|---|
-| **Données simulées** | Les performances (F1 de 0,85, pointe de Tozeur) sont mesurées sur des données que nous avons nous-mêmes générées : elles démontrent le fonctionnement, pas la performance sur un vrai réseau. | Présenter ces résultats comme une démonstration. |
+| **Données simulées** | Les performances (F1 de 0,83, pointe de Tozeur) sont mesurées sur des données que nous avons nous-mêmes générées : elles démontrent le fonctionnement, pas la performance sur un vrai réseau. | Présenter ces résultats comme une démonstration. |
 | **Prévision volontairement simple** | Elle s’appuie sur l’historique de 7 jours et ne prend en compte aucune source externe, comme une météo réelle. | Source externe ajoutable ensuite (§ 4.8). |
-| **Paramètres illustratifs** | Les tarifs sont fictifs (non officiels) ; le facteur d’émission du réseau doit être justifié. Le seuil de 92 % vient de l’énoncé (tableau des seuils, Track 7). | Citer l’énoncé (seuil) et une source (facteur d’émission) dans le README (§ 7.4). |
+| **Paramètres illustratifs** | Les tarifs sont fictifs (non officiels) ; le facteur d’émission retenu (0,468 kgCO₂/kWh) doit encore être revérifié à sa source. Le seuil de 92 % vient de l’énoncé (tableau des seuils, Track 7). | Source du facteur d’émission citée au § 7.4, à valider par l’équipe avant la remise. |
 | **Dépendances entre rôles** | Les Rôles 4 et 5 doivent livrer leurs stubs rapidement : ils débloquent le serveur MCP (Rôle 2) et l’agent. GraphQL (Rôle 3) suppose l’authentification JWT du Rôle 2. | Si un membre a besoin d’un stub non créé, il le crée lui-même et prévient toute l’équipe. |
 | **Concentration de la charge sur le Rôle 1** | Le Rôle 1 possède de nombreux fichiers et sert de goulot d’étranglement pour tout changement de modèle. | Chaque membre comprend les modèles qu’il utilise. |
+| **Types d’anomalie attribués par règles** (Semaine 2) | Le type (tension, onduleur, pompe, batterie) est déduit de règles écrites d’après ce que le simulateur injecte. Le F1 de 0,83 mesure la détection, pas l’exactitude du type. | Revoir ces règles sur de vraies données (§ 4.7). |
 | **Code hérité du starter** | Les fichiers du starter (exemple Track 1 « eau ») contiennent des noms obsolètes (`MOISTURE`, `crop_or_sector_type`…). | Les réécrire entièrement, pas à moitié. |
 | **Retard sur le calendrier de l’énoncé** | L’énoncé place REST, GraphQL, JWT et UML en Semaine 1 ; ces éléments ne sont pas encore livrés. | Rattrapage en priorité en Semaine 2 (§ 7.3). |
 
@@ -378,12 +501,13 @@ Détail critère par critère, avec les écarts à l’énoncé officiel : [Anne
 
 ### 7.1 Rôle 1 (Ali)
 
-- [ ] Enregistrer dans `AnomalyAndForecastEvent` les anomalies de nœud détectées par l’IsolationForest (type, sévérité).
-- [ ] Déclencher `run_agent` automatiquement sur une anomalie `CRITICAL`, et tester `TriggerUrgentAudit` dès que l’agent existe.
-- [ ] Rédiger le README : facteur d’émission sourcé, tarifs signalés comme illustratifs, procédure d’installation.
+- [x] Enregistrer dans `AnomalyAndForecastEvent` les anomalies de nœud détectées par l’IsolationForest (type, sévérité) — **fait en Semaine 2**.
+- [x] Déclencher `run_agent` automatiquement sur les incidents `CRITICAL` — **fait en Semaine 2** (`agent_trigger.py`, § 4.12).
+- [ ] Tester le déclenchement de bout en bout (`run_agent` et `TriggerUrgentAudit`) dès que l’agent du Rôle 4 existe.
+- [x] Rédiger le README : facteur d’émission sourcé, tarifs signalés comme illustratifs, procédure d’installation — **fait en Semaine 2** ; à compléter avec les parties des autres rôles.
 - [ ] Produire les diagrammes UML (classes, à partir du Mermaid de `models.md` ; séquence) et le schéma d’architecture, puis assembler les slides (`.pptx` et `.pdf`, avec matrices de comparaison) et la vidéo (§ 7.5).
 - [ ] Fusionner les branches dans `main` après test.
-- [ ] Documenter l’évaluation du ML (précision, rappel et F1 dans un tableau).
+- [x] Documenter l’évaluation du ML (précision, rappel et F1) — **fait en Semaine 2** (§ 4.7).
 - [ ] Rétablir le démarrage en une commande (`docker compose up`) avant la remise (critère 6.2).
 
 ### 7.2 Objectifs des Rôles 2 à 5
@@ -409,7 +533,7 @@ Détail critère par critère, avec les écarts à l’énoncé officiel : [Anne
 
 | Décision | Pourquoi elle compte |
 |---|---|
-| Choisir et citer la source du facteur d’émission du réseau tunisien | Il sert au calcul des crédits carbone, refusé s’il manque dans `.env`. |
+| Valider le facteur d’émission du réseau tunisien | Valeur proposée : **0,468 kgCO₂/kWh**, moyenne IEA relevée dans le rapport « EPIC Deploy: Tunisia Cooling assessment » (2026) ; alternative : 0,483 (Electricity Maps 2025, cité dans le rapport carbone 2025 du groupe Qair). À revérifier à la source IEA, puis à communiquer au Rôle 5. Il sert au calcul des crédits carbone, refusé s’il manque dans `.env`. |
 | Définir précisément ce qui sera « zero-knowledge » et ce qui ne le sera pas | Commitment et vérification de borne d’abord, vrai circuit seulement si le temps le permet : on évite de promettre plus que ce qui sera livré. |
 | Choisir le modèle de langage : Groq (gratuit) ou Ollama (local) | L’énoncé évalue l’intégration d’un modèle de langage dans la boucle de l’agent (critère 4.1). |
 | Fixer les échéances internes des livrables | Le calendrier de l’énoncé est fixé (§ 7.3) ; il reste à poser des jalons intermédiaires, vu les dépendances entre rôles (§ 6). |
@@ -443,6 +567,9 @@ La défense est **individuelle** (5 points sur 20) : chacun explique son propre 
 | Quelles sont les limites de la prévision et des résultats ? | Données simulées, 7 jours d’historique, pas de météo réelle ; méthode simple mais déterministe. | § 4.8 et § 6 |
 | Pourquoi un seuil de 92 % ? | C’est le seuil critique indiqué par l’énoncé pour le Track 7 : au-delà, le feeder est considéré en surcharge pendant la pointe du soir. | § 4.7 |
 | Pourquoi n8n n’est-il pas utilisé pour l’ingestion et l’agent ? | Le cœur (gRPC, agent, preuves) doit rester typé et transactionnel en Python ; n8n sert aux frontières : alertes sortantes et données externes. | § 4.11 |
+| Comment le type et la sévérité d’une anomalie de nœud sont-ils décidés ? | Le type vient de règles lisibles (tension, production, pompe, batterie) ; la sévérité vient du rang du score : 10 % `CRITICAL`, 30 % `MEDIUM`, le reste `LOW`. | § 4.7 |
+| Pourquoi autant d’événements `PUMP_MISALIGNED` ? | Pendant la surcharge de Tozeur, les pompes tournent le soir, hors de la fenêtre solaire 10 h–15 h : la règle les étiquette ainsi. | § 4.7 |
+| Comment l’agent est-il déclenché automatiquement, et pourquoi une seule exécution par incident ? | La détection lance `run_agent` sur les incidents `CRITICAL` ; on regroupe par nœud ou feeder et par jour pour ne pas lancer l’agent 62 fois pour le même incident. | § 4.12 |
 
 ---
 
@@ -492,7 +619,7 @@ La défense est **individuelle** (5 points sur 20) : chacun explique son propre 
 
 | Dossier ou fichier | Contenu | Propriétaire | État |
 |---|---|---|---|
-| `backend/tunisovereign_core/` (`models.py`, `migrations/` 0001 et 0002, `ml_anomaly.py`, commandes `seed_solarsouk` et `detect_anomalies`, `test_models_0002.py`) | Modèles, ML, données de référence, détection | Rôle 1 (Ali) | ✅ Fait |
+| `backend/tunisovereign_core/` (`models.py`, `migrations/` 0001 et 0002, `ml_anomaly.py`, `agent_trigger.py`, commandes `seed_solarsouk` et `detect_anomalies`, `test_models_0002.py`) | Modèles, ML, données de référence, détection | Rôle 1 (Ali) | ✅ Fait |
 | `backend/tunisovereign_core/api_rest.py` | API REST | Rôle 2 (Mohamed) | ⬜ Starter à réécrire |
 | `backend/tunisovereign_core/schema_graphql.py` | GraphQL | Rôle 3 (Adem) | ⬜ Starter à réécrire |
 | `backend/config/` | Configuration Django ; `urls.py` appartient au Rôle 2 | Rôles 1 et 2 (Ali et Mohamed) | ✅ En place |
@@ -506,6 +633,7 @@ La défense est **individuelle** (5 points sur 20) : chacun explique son propre 
 | `contracts/` | Contrat Solidity et client web3 | Rôle 5 (Mahdi) | ⬜ Starter à réécrire |
 | `dashboard/`, `workflows/` | Tableau de bord, workflow n8n | Rôle 3 (Adem) | ⬜ Starter à réécrire |
 | `docs/` | `models.md`, `contrats_interfaces.md`, `notes_role1.md` | Rôle 1 (Ali) | ✅ Fait |
+| `README.md` (racine) | Avancement par semaine, architecture, installation, hypothèses | Rôle 1 (Ali) | ✅ Fait |
 
 ### Annexe C — Reproduire les résultats
 
@@ -526,9 +654,27 @@ Résultat attendu : `db` healthy, `init` Exited (0), `grpc` healthy.
 docker compose run --rm simulate
 ```
 
-Résultat attendu : `accepted_count = 33600 / 33600`, puis « 42 événement(s) en base ».
+Résultat attendu : `accepted_count = 33600 / 33600`, puis le résumé de la détection : « Total : 244 événement(s) en base, dont 42 surcharge(s) feeder » (42 événements en Semaine 1, avant l’ajout des anomalies de nœud). Si l’ancien chiffre s’affiche encore, reconstruire l’image : `docker compose up -d --build grpc`.
 
-**Étape 3 — Vérifier depuis le `.venv`** que la base contient 33 600 mesures et 42 événements (étape 4 du guide de démarrage).
+**Étape 3 — Vérifier depuis le `.venv`** que la base contient 33 600 mesures et 244 événements (42 surcharges feeder et 202 anomalies de nœud ; étape 4 du guide de démarrage).
+
+**Étape 4 — Relancer la détection et l’évaluation du ML** (Semaine 2). Activer d’abord l’environnement Python, puis se placer dans `backend`.
+
+```bash
+.venv\Scripts\Activate.ps1        # Windows PowerShell   (Mac / Linux : source .venv/bin/activate)
+cd backend
+python manage.py detect_anomalies --clear
+python -m tunisovereign_core.ml_anomaly
+```
+
+Résultat attendu : 42 surcharges feeder, 202 anomalies de nœud, 244 événements au total ; F1 de l’IsolationForest = 0,83 et F1 de la règle feeder = 1,0.
+
+| Option de `detect_anomalies` | Effet |
+|---|---|
+| `--clear` | Supprime tous les événements avant de détecter |
+| `--skip-ml` | Ne lance que la règle de surcharge feeder |
+| `--no-agent` | Ne déclenche pas l’agent sur les anomalies `CRITICAL` |
+| `--max-agent-runs N` | Nombre maximal d’exécutions de l’agent par lancement (défaut 5) |
 
 **En cas de problème :** une base dans un mauvais état se répare par une réinitialisation complète, puis les étapes 1 et 2.
 
@@ -556,13 +702,13 @@ docker compose down -v
 | Modèles Django 6 (TextChoices, index, AbstractUser à 4 rôles) fidèles aux UML de classes et de séquence | 2.1 | 🟡 | 12 modèles faits ; UML à produire (Rôle 1) |
 | JWT (inscription, connexion, rafraîchissement) avec rôle, gouvernorat et portefeuille ; permissions par rôle ; secrets dans `.env` | 2.2 | 🟡 | Rôles, comptes et `.env` faits ; JWT et permissions à faire (Rôle 2) |
 | Simulateur : motifs diurnes et saisonniers, injection d’anomalies reproductible | 3.1 | ✅ | Validé : injection d’anomalies rejouable, motifs réalistes, mesures conformes à l’énoncé |
-| ML : IsolationForest ou Z-score glissant, intégré à Django, avec rapport précision, rappel et F1 | 3.2 | 🟡 | F1 ≈ 0,85 mesuré ; précision et rappel à publier (§ 7.1) |
+| ML : IsolationForest ou Z-score glissant, intégré à Django, avec rapport précision, rappel et F1 | 3.2 | ✅ | IsolationForest intégré à Django (commande `detect_anomalies`) ; rapport publié en Semaine 2 : précision 0,88, rappel 0,79, F1 = 0,83 (§ 4.7) |
 | Agent LangGraph cyclique (ReAct + Plan-and-Solve) : routage conditionnel, checkpointing PostgreSQL, modèle de langage Groq ou Ollama | 4.1 | ⬜ | Rôle 4 : checkpointing et modèle de langage ajoutés aux objectifs (§ 2.2, 7.2) |
 | Serveur MCP (FastMCP) : au moins 2 ressources et 2 outils | 4.2 | ⬜ | Fonctions réparties en 2 ressources et 4 outils (§ 2.3) |
 | Au moins 3 classes Skill réutilisables, testées | 4.3 | 🟡 | 1 des 3 skills imposées faite et testée ; skill d’analyse du langage (darija) ajoutée aux objectifs du Rôle 4 (§ 7.2) |
 | Contrat Solidity déployé via Web3.py (Anvil ou testnet), `tx_hash` stocké dans Django | 5.1 | ⬜ | Rôles 4 et 5 (§ 7.2) |
 | Preuve de conformité au quota sans fuite de données (commitment ou ZK) | 5.2 | ⬜ | Périmètre à définir (§ 7.4) |
 | Tableau de bord : carte des gouvernorats, graphes en direct, trace de l’agent, console interactive, vérificateur de transaction ; workflows n8n | 6.1 | ⬜ | Rôle 3 ; console, flux temps réel et webhook sortant Django → n8n ajoutés à l’objectif (§ 4.11, 7.2) |
-| Démarrage par `docker compose up` seul ; README d’architecture | 6.2 | 🟡 | Docker fonctionne avec services nommés ; commande unique à rétablir (§ 4.9) ; README à rédiger |
+| Démarrage par `docker compose up` seul ; README d’architecture | 6.2 | 🟡 | Docker fonctionne avec services nommés ; commande unique à rétablir (§ 4.9) ; README rédigé (Semaine 2), à compléter avec les parties des autres rôles |
 | Remise : code, slides `.pptx` et `.pdf`, vidéo `.mp4` de 5 à 10 min, à la fin de la Semaine 4 | § 7.1 | ⬜ | Contenu et calendrier : § 7.3 et 7.5 |
 | Défense orale individuelle | 7.1 | 🟡 | Journaux de rôle et questions du § 8 |
