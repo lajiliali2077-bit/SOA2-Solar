@@ -1,3 +1,8 @@
+"""
+Schéma GraphQL de SolarSouk-STEG (Rôle 3).
+Les données renvoyées dépendent du rôle de l'utilisateur connecté
+(session Django ou jeton JWT).
+"""
 from typing import List, Optional
 
 import strawberry
@@ -139,6 +144,7 @@ class FeederLoadGraphType:
     feeder_name: str
     capacity_kw: float
     points: List[LoadPointType]
+    anomalies: List[AnomalyType]
 
 
 # ---------------------------------------------------------------------------
@@ -208,11 +214,19 @@ class Query:
                 )
             )
 
+        # Anomalies du feeder (ou de ses nœuds), limitées à ce que l'utilisateur peut voir
+        anomalies = list(
+            visible_anomalies(user)
+            .filter(Q(feeder=feeder) | Q(node__feeder=feeder))
+            .order_by("-detected_at")[:MAX_LIMIT]
+        )
+
         return FeederLoadGraphType(
             feeder_id=feeder.id,
             feeder_name=feeder.name,
             capacity_kw=feeder.capacity_kw,
             points=points,
+            anomalies=anomalies,
         )
 
 
