@@ -1,7 +1,6 @@
 """
 Agent LangGraph du Rôle 4 : point d'entrée `run_agent`.
 
-)
 STUB (incrément 2) : respecte le contrat `run_agent(anomaly_id) -> int` pour débloquer
 agent_trigger.py (Ali) et le serveur gRPC. Il crée l'exécution liée à l'anomalie
 (statut RUNNING), puis la termine (COMPLETED) sans rien décider. La vraie version
